@@ -28,9 +28,33 @@ app.post('/api/auth/login', async (req, res) => {
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => { if (err) throw err; res.json({ token }); });
     } catch (err) { res.status(500).json({ error: "Server error." }); }
 });
+// --- PROTECTED API ROUTES ---
+
+// Get all Trinity Dial entries for the logged-in user
 app.get('/api/trinity', authMiddleware, async (req, res) => {
-    const { rows } = await db.query('SELECT * FROM trinity_entries WHERE user_id = $1 ORDER BY id DESC', [req.user.id]);
-    res.json(rows);
+    try {
+        const { rows } = await db.query(
+            'SELECT * FROM trinity_entries WHERE user_id = $1 ORDER BY entry_date DESC, created_at DESC', 
+            [req.user.id]
+        );
+        res.json(rows);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// Add a new Trinity Dial entry
+app.post('/api/trinity', authMiddleware, async (req, res) => {
+    const { activity_name, focus_score, flow_score, fulfillment_score } = req.body;
+    try {
+        const { rows } = await db.query(
+            'INSERT INTO trinity_entries (user_id, activity_name, focus_score, flow_score, fulfillment_score) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [req.user.id, activity_name, focus_score, flow_score, fulfillment_score]
+        );
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
 });
 app.post('/api/trinity', authMiddleware, async (req, res) => {
     const { activity_name, focus_score, flow_score, fulfillment_score } = req.body;
